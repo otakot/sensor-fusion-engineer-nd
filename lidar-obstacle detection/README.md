@@ -16,7 +16,7 @@
 
    ```sh
    git clone https://github.com/otakot/sensor-fusion-engineer-nd.git
-   cd sensor-fusion-engineer-nd/
+   cd sensor-fusion-engineer-nd/lidar-obstacle-detection/
    sudo apt install libpcl-dev
    sudo apt install qt5-default
    mkdir build && cd build
@@ -37,7 +37,7 @@
    brew install qt5
    export Qt5_DIR=/usr/local/opt/qt5/  # change to location of qt5 lib on your machine
    git clone https://github.com/otakot/sensor-fusion-engineer-nd.git
-   cd sensor-fusion-engineer-nd/
+   cd sensor-fusion-engineer-nd/lidar-obstacle-detection/
    mkdir build && cd build
    cmake ..
    cmake --build . --target lidar-obstacle-detection
