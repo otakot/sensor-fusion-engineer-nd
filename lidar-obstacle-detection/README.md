@@ -24,12 +24,12 @@
    cmake --build . --target lidar-obstacle-detection
    ./lidar-obstacle-detection
    ```
-   
-   ## Mac
-   
+
+   ## MacOS
+
    1. Install [homebrew](https://brew.sh/)
    2. Execute the following commands in a terminal:
-   
+
    ```sh
    brew update
    brew tap brewsci/science
