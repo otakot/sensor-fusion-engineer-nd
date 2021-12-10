@@ -35,8 +35,8 @@ void PointCloudProcessor<PointT>::numPoints(PointCloudPtr<PointT> cloud)
 }
 
 template <typename PointT>
-PointCludPtr<PointT> PointCloudProcessor<PointT>::filterCloud(PointCloudPtr<PointT> cloud, float filter_resolution,
-                                                              Eigen::Vector4f min_point, Eigen::Vector4f max_point)
+PointCloudPtr<PointT> PointCloudProcessor<PointT>::filterCloud(PointCloudPtr<PointT> cloud, float filter_resolution,
+                                                               Eigen::Vector4f min_point, Eigen::Vector4f max_point)
 {
     // Time segmentation process
     auto start_time = std::chrono::steady_clock::now();
@@ -151,6 +151,7 @@ std::pair<PointCloudPtr<PointT>, PointCloudPtr<PointT>> PointCloudProcessor<Poin
         // iterate over the points of data set and find those of them closer to
         // the plane than provided threshold distance from point to plane:
         // |A*x+B*y+C*z+D|/sqrt(A^2+B^2+C^2)
+        auto divider = sqrt(a * a + b * b + c * c);
         for (std::size_t index = 0; index < cloud->points.size(); index++)
         {
             // skip points used for building the plane
@@ -159,7 +160,7 @@ std::pair<PointCloudPtr<PointT>, PointCloudPtr<PointT>> PointCloudProcessor<Poin
                 continue;
             }
             const auto &point = cloud->points[index];
-            float dist = fabs(a * point.x + b * point.y + c * point.z + d) / sqrt(a * a + b * b + c * c);
+            float dist = fabs(a * point.x + b * point.y + c * point.z + d) / divider;
             if (dist < distance_threshold)
             {
                 inliers.insert(index);
