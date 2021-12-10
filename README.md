@@ -1,2 +1,2 @@
 # sensor-fusion-engineer-nd
-My projects for Sensor Fusion Engineer Nano Degree educational course
+Implementations of the projects of Sensor Fusion Engineer Nano Degree educational course
