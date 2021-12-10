@@ -58,8 +58,7 @@ PointCloudPtr<PointT> PointCloudProcessor<PointT>::filterCloud(PointCloudPtr<Poi
     PointCloudPtr<PointT> filtered_cloud_roi(new typename pcl::PointCloud<PointT>());
     roi_crop_box.filter(*filtered_cloud_roi);
 
-    // crop points in close proximilty to lidar (ego car roof surface
-    // occlusions)
+    // crop points in close proximilty to lidar (ego car roof surface occlusions)
     pcl::CropBox<PointT> roof_crop_box(true);
     roof_crop_box.setMin(Eigen::Vector4f(-1.5, -1.7, -1.1, 1));
     roof_crop_box.setMax(Eigen::Vector4f(2.6, 1.7, -0.4, 1));

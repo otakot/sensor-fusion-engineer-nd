@@ -8,27 +8,25 @@ void renderCityBlock(pcl::visualization::PCLVisualizer::Ptr& viewer,
                      PointCloudProcessor<pcl::PointXYZI>* point_processor,
                      const pcl::PointCloud<pcl::PointXYZI>::Ptr& input_cloud)
 {
-    // input point cloud filtering constants
-    const float kFilterResolution = 0.17F;  // in meters
-    const float kFilterBBoxMinX = -8.F;     // in meters
-    const float kFilterBBoxMinY = -6.F;     // in meters
-    const float kFilterBBoxMinZ = -2.F;     // in meters
-    const float kFilterBBoxMaxX = 20.F;     // in meters
-    const float kFilterBBoxMaxY = 6.F;      // in meters
-    const float kFilterBBoxMaxZ = 3.F;      // in meters
+    // input point cloud filtering constants (all values are in meters)
+    const float kFilterResolution = 0.17F;
+    const float kFilterBBoxMinX = -8.F;
+    const float kFilterBBoxMinY = -6.F;
+    const float kFilterBBoxMinZ = -2.F;
+    const float kFilterBBoxMaxX = 20.F;
+    const float kFilterBBoxMaxY = 6.F;
+    const float kFilterBBoxMaxZ = 3.F;
 
     // plane segmentation constants
     const uint8_t kSegmentationMaxIterations = 25U;
-    const float kSegmentationDistanceThreshold = 0.16F;  // in meters
+    const float kSegmentationDistanceThreshold = 0.16F;  // meters
 
     // obstacle point clouds clastering constants
-    const float kClusteringDistanceThreshold = 0.44575F;
-    const uint16_t kClusteringMinSize = 17U;
-    const uint16_t kClusteringMaxSize = 1000U;
+    const float kClusteringDistanceThreshold = 0.44575F;  // meters
+    const uint16_t kClusteringMinSize = 17U;              // points
+    const uint16_t kClusteringMaxSize = 1000U;            // points
 
     // FILTER POINT CLOUD
-    // const auto& filteredCloud = pointProcessorI->FilterCloud(inputCloud, 0.15f , Eigen::Vector4f (-10.f, -6.3f,
-    // -2.2f, 1), Eigen::Vector4f ( 30.f, 6.3f, 2.f, 1));
     const auto& filtered_cloud = point_processor->filterCloud(
         input_cloud, kFilterResolution, Eigen::Vector4f(kFilterBBoxMinX, kFilterBBoxMinY, kFilterBBoxMinZ, 1),
         Eigen::Vector4f(kFilterBBoxMaxX, kFilterBBoxMaxY, kFilterBBoxMaxZ, 1));
@@ -42,7 +40,7 @@ void renderCityBlock(pcl::visualization::PCLVisualizer::Ptr& viewer,
                                                              kClusteringMinSize, kClusteringMaxSize);
 
     // RENDER POINT CLOUD(S)
-    // redefine color palete for obstacles
+    // define color palette for detected obstacles
     const std::vector<Color> colors = {Color(1, 0, 0), Color(1, 1, 0), Color(0, 0, 1), Color(0, 1, 1), Color(1, 0, 1)};
 
     int cluster_id = 0;
