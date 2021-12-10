@@ -2,34 +2,40 @@
 
 #pragma once
 
-#include "box.h"
+#include <pcl/common/common.h>
 
 #include <boost/filesystem/operations.hpp>
-#include <pcl/common/common.h>
-#include <vector>
 #include <unordered_set>
+#include <vector>
 
-template<typename PointType>
+#include "box.h"
+
+template <typename PointType>
 using PointCloudPtr = typename pcl::PointCloud<PointType>::Ptr;
 
-template<typename PointT>
+template <typename PointT>
 class PointCloudProcessor
 {
-public:
-    //constructor
+   public:
+    // constructor
     PointCloudProcessor();
-    //deconstructor
+    // deconstructor
     ~PointCloudProcessor();
 
     void numPoints(PointCloudPtr<PointT> cloud);
 
-    PointCloudPtr<PointT> filterCloud(PointCloudPtr<PointT> cloud, float filterRes, Eigen::Vector4f minPoint, Eigen::Vector4f maxPoint);
+    PointCloudPtr<PointT> filterCloud(PointCloudPtr<PointT> cloud, float filterRes, Eigen::Vector4f minPoint,
+                                      Eigen::Vector4f maxPoint);
 
-    std::pair<PointCloudPtr<PointT>, PointCloudPtr<PointT>> separateClouds(std::unordered_set<std::size_t> inlier_indices, PointCloudPtr<PointT> cloud);
+    std::pair<PointCloudPtr<PointT>, PointCloudPtr<PointT>> separateClouds(
+        std::unordered_set<std::size_t> inlier_indices, PointCloudPtr<PointT> cloud);
 
-    std::pair<PointCloudPtr<PointT>, PointCloudPtr<PointT>> segmentPlane(PointCloudPtr<PointT> cloud, uint8_t maxIterations, float distanceThreshold);
+    std::pair<PointCloudPtr<PointT>, PointCloudPtr<PointT>> segmentPlane(PointCloudPtr<PointT> cloud,
+                                                                         uint8_t maxIterations,
+                                                                         float distanceThreshold);
 
-    std::vector<PointCloudPtr<PointT>> clustering(PointCloudPtr<PointT> cloud, float clusterTolerance, uint16_t minSize, uint16_t maxSize);
+    std::vector<PointCloudPtr<PointT>> clustering(PointCloudPtr<PointT> cloud, float clusterTolerance, uint16_t minSize,
+                                                  uint16_t maxSize);
 
     /// @author Aaron Brown
     Box createBoundingBox(PointCloudPtr<PointT> cluster);
