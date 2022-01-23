@@ -30,3 +30,7 @@ void descKeypoints(std::vector<cv::KeyPoint> &keypoints, cv::Mat &img, cv::Mat &
 void matchDescriptors(std::vector<cv::KeyPoint> &kPtsSource, std::vector<cv::KeyPoint> &kPtsRef, cv::Mat &descSource,
                       cv::Mat &descRef, std::vector<cv::DMatch> &matches, std::string descriptorType,
                       std::string matcherType, std::string selectorType);
+
+void visualizeKeypoints(const std::vector<cv::KeyPoint> &keypoints, const cv::Mat &img, std::string detectorType);
+
+cv::Ptr<cv::FeatureDetector> initDetector(std::string detectorType);
