@@ -16,24 +16,51 @@ void matchDescriptors(std::vector<cv::KeyPoint> &kPtsSource, std::vector<cv::Key
 
     if (matcherType.compare("MAT_BF") == 0)
     {
-        int normType = cv::NORM_HAMMING;
+        int normType = descriptorType.compare("DES_BINARY") == 0 ? cv::NORM_HAMMING : cv::NORM_L2;
         matcher = cv::BFMatcher::create(normType, crossCheck);
     }
     else if (matcherType.compare("MAT_FLANN") == 0)
     {
-        // ...
+        if (descSource.type() != CV_32F)
+        {  // OpenCV bug workaround : convert binary descriptors to floating point due to a bug in current OpenCV
+           // implementation
+            descSource.convertTo(descSource, CV_32F);
+            descRef.convertTo(descRef, CV_32F);
+        }
+
+        matcher = cv::DescriptorMatcher::create(cv::DescriptorMatcher::FLANNBASED);
+    }
+    else
+    {
+        string error_message = "Unsupported matcher type: " + matcherType;
+        throw runtime_error(error_message);
     }
 
     // perform matching task
     if (selectorType.compare("SEL_NN") == 0)
-    {  // nearest neighbor (best match)
-
+    {
+        // nearest neighbor (best match)
         matcher->match(descSource, descRef, matches);  // Finds the best match for each descriptor in desc1
     }
     else if (selectorType.compare("SEL_KNN") == 0)
     {  // k nearest neighbors (k=2)
+        vector<vector<cv::DMatch>> knn_matches;
+        matcher->knnMatch(descSource, descRef, knn_matches, 2);
 
-        // ...
+        // filter matches using descriptor distance ratio test
+        double minDescDistRatio = 0.8;
+        for (auto it = knn_matches.begin(); it != knn_matches.end(); ++it)
+        {
+            if ((*it)[0].distance < minDescDistRatio * (*it)[1].distance)
+            {
+                matches.push_back((*it)[0]);
+            }
+        }
+    }
+    else
+    {
+        string error_message = "Unsupported match selector type: " + selectorType;
+        throw runtime_error(error_message);
     }
 }
 
@@ -51,9 +78,30 @@ void descKeypoints(vector<cv::KeyPoint> &keypoints, cv::Mat &img, cv::Mat &descr
 
         extractor = cv::BRISK::create(threshold, octaves, patternScale);
     }
+    else if (descriptorType.compare("BRIEF") == 0)
+    {
+        extractor = cv::xfeatures2d::BriefDescriptorExtractor::create();
+    }
+    else if (descriptorType.compare("ORB") == 0)
+    {
+        extractor = cv::ORB::create();
+    }
+    else if (descriptorType.compare("FREAK") == 0)
+    {
+        extractor = cv::xfeatures2d::FREAK::create();
+    }
+    else if (descriptorType.compare("AKAZE") == 0)
+    {
+        extractor = cv::AKAZE::create();
+    }
+    else if (descriptorType.compare("SIFT") == 0)
+    {
+        extractor = cv::SIFT::create();
+    }
     else
     {
-        //...
+        string error_message = "Unsupported keypoint descriptor type: " + descriptorType;
+        throw runtime_error(error_message);
     }
 
     // perform feature description
@@ -191,9 +239,9 @@ cv::Ptr<cv::FeatureDetector> initDetector(std::string detectorType)
     {
         return cv::ORB::create();
     }
-    else if (detectorType.compare("KAZE") == 0)
+    else if (detectorType.compare("AKAZE") == 0)
     {
-        return cv::KAZE::create();
+        return cv::AKAZE::create();
     }
     else if (detectorType.compare("SIFT") == 0)
     {
