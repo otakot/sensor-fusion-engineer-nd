@@ -100,7 +100,10 @@ int main(int argc, const char *argv[])
             std::copy_if(std::make_move_iterator(keypoints.begin()), std::make_move_iterator(keypoints.end()),
                          std::back_inserter(filtered_keypoints), isKeyPointInRect);
             keypoints = filtered_keypoints;
-            visualizeKeypoints(keypoints, imgGray, detectorType);
+            if (bVis)
+            {
+                visualizeKeypoints(keypoints, imgGray, detectorType);
+            }
             cout << "NOTE: Keypoints have been truncated to front vehicle area only! New amount of key points: "
                  << keypoints.size() << endl;
         }
@@ -154,7 +157,6 @@ int main(int argc, const char *argv[])
             cout << "#4 : MATCH KEYPOINT DESCRIPTORS done" << endl;
 
             // visualize matches between current and previous image
-            bVis = true;
             if (bVis)
             {
                 cv::Mat matchImg = ((dataBuffer.end() - 1)->cameraImg).clone();
@@ -169,7 +171,6 @@ int main(int argc, const char *argv[])
                 cout << "Press key to continue to next image" << endl;
                 cv::waitKey(0);  // wait for key to be pressed
             }
-            bVis = false;
         }
 
     }  // eof loop over all images
