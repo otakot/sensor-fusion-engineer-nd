@@ -12,6 +12,7 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/xfeatures2d.hpp>
 #include <sstream>
+#include <string>
 #include <vector>
 
 #include "dataStructures.h"
@@ -33,3 +34,8 @@ void matchDescriptors(std::vector<cv::KeyPoint> &kPtsSource, std::vector<cv::Key
 void visualizeKeypoints(const std::vector<cv::KeyPoint> &keypoints, const cv::Mat &img, std::string detectorType);
 
 cv::Ptr<cv::FeatureDetector> initDetector(std::string detectorType);
+
+/// @brief Returns the type of keypoint descriptor (bi) for given decriptior name
+/// @details Supported decriptor types: binary and HOG based
+/// @return type of descriptor. Supported values: DES_BINARY, DES_HOG
+std::string getDescriptorType(std::string descriptorName);
