@@ -79,7 +79,7 @@ void descKeypoints(vector<cv::KeyPoint> &keypoints, cv::Mat &img, cv::Mat &descr
     }
     else if (descriptorType.compare("BRIEF") == 0)
     {
-        extractor = cv::xfeatures2d::BriefDescriptorExtractor::create(64);
+        extractor = cv::xfeatures2d::BriefDescriptorExtractor::create();
     }
     else if (descriptorType.compare("ORB") == 0)
     {
@@ -107,7 +107,7 @@ void descKeypoints(vector<cv::KeyPoint> &keypoints, cv::Mat &img, cv::Mat &descr
     double t = (double)cv::getTickCount();
     extractor->compute(img, keypoints, descriptors);
     t = ((double)cv::getTickCount() - t) / cv::getTickFrequency();
-    cout << "   " << descriptorType << " descriptor extraction: descriptors matrix zise: " << descriptors.size()
+    cout << "   " << descriptorType << " descriptor extraction: descriptors: " << descriptors.size()
          << ", duration: " << 1000 * t / 1.0 << " ms" << endl;
 }
 
