@@ -180,7 +180,7 @@ int main(int argc, const char* argv[])
         for (const auto descriptor : descriptors)
         {
             if (detector.compare("SIFT") == 0 && descriptor.compare("ORB") == 0)
-            {
+            {  // this couple does not work together in OpenCV lib
                 continue;
             }
             processImages(detector, descriptor, matcherType);
