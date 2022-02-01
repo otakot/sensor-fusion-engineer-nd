@@ -25,7 +25,7 @@
    ./lidar-obstacle-detection
    ```
 
-   ## MacOS
+## MacOS
 
    1. Install [homebrew](https://brew.sh/)
    2. Execute the following commands in a terminal:
