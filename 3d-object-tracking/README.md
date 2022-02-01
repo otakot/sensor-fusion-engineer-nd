@@ -30,7 +30,7 @@ This project provides implementation of real timne system for tracking of 3D Obj
 
    ```sh
    git clone https://github.com/otakot/sensor-fusion-engineer-nd.git
-   cd sensor-fusion-engineer-nd/2d-object-tracking/
+   cd sensor-fusion-engineer-nd/3d-object-tracking/
    mkdir build && cd build
    cmake ..
    cmake --build . --target 3D_object_tracking
