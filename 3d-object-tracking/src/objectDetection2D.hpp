@@ -3,11 +3,17 @@
 #define objectDetection2D_hpp
 
 #include <stdio.h>
+
 #include <opencv2/core.hpp>
 
 #include "dataStructures.h"
 
-void detectObjects(cv::Mat& img, std::vector<BoundingBox>& bBoxes, float confThreshold, float nmsThreshold, 
-                   std::string basePath, std::string classesFile, std::string modelConfiguration, std::string modelWeights, bool bVis);
+void detectObjects(cv::Mat& img, std::vector<BoundingBox>& bBoxes, float confThreshold, float nmsThreshold,
+                   std::string basePath, std::string classesFile, std::string modelConfiguration,
+                   std::string modelWeights, bool bVis);
+
+void showDetectedObjects(const cv::Mat& img, const std::vector<BoundingBox>& bBoxes, std::string classesFile,
+                         const cv::Scalar& bboxFrameColor = {0, 255, 0},
+                         std::string windowName = "Detected objects of current frame");
 
 #endif /* objectDetection2D_hpp */

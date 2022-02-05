@@ -73,7 +73,6 @@ int main(int argc, const char *argv[])
     double sensorFrameRate = 10.0 / imgStepWidth;  // frames per second for Lidar and camera
     int dataBufferSize = 2;        // no. of images which are held in memory (ring buffer) at the same time
     vector<DataFrame> dataBuffer;  // list of data frames which are held in memory at the same time
-    bool bVis = false;             // visualize results
 
     /* MAIN LOOP OVER ALL IMAGES */
 
@@ -100,9 +99,19 @@ int main(int argc, const char *argv[])
 
         float confThreshold = 0.2;
         float nmsThreshold = 0.4;
+        bool showCurrFrameDetectedObjects = true;
+        // detect objects in current frame
         detectObjects((dataBuffer.end() - 1)->cameraImg, (dataBuffer.end() - 1)->boundingBoxes, confThreshold,
-                      nmsThreshold, yoloBasePath, yoloClassesFile, yoloModelConfiguration, yoloModelWeights, bVis);
+                      nmsThreshold, yoloBasePath, yoloClassesFile, yoloModelConfiguration, yoloModelWeights,
+                      showCurrFrameDetectedObjects);
 
+        // visualize object of previous frame
+        bool showPrevFrameDetectedObjects = false;
+        if (showPrevFrameDetectedObjects && dataBuffer.size() > 1)
+        {
+            showDetectedObjects((dataBuffer.end() - 2)->cameraImg, (dataBuffer.end() - 2)->boundingBoxes,
+                                yoloClassesFile, {0, 0, 255}, "Detected ojects of previous frame");
+        }
         cout << "#2 : DETECT & CLASSIFY OBJECTS done" << endl;
 
         /* CROP LIDAR POINTS */
@@ -129,12 +138,11 @@ int main(int argc, const char *argv[])
                             P_rect_00, R_rect_00, RT);
 
         // Visualize 3D objects
-        bVis = true;
-        if (bVis)
+        bool showLidarPointsOfBoundingBoxesIn2D = true;
+        if (showLidarPointsOfBoundingBoxesIn2D)
         {
-            show3DObjects((dataBuffer.end() - 1)->boundingBoxes, cv::Size(4.0, 20.0), cv::Size(1000, 1000), true);
+            show3DObjects((dataBuffer.end() - 1)->boundingBoxes, cv::Size(4.0, 20.0), cv::Size(2000, 2000), true);
         }
-        bVis = false;
 
         cout << "#4 : CLUSTER LIDAR POINT CLOUD done" << endl;
 
@@ -182,7 +190,7 @@ int main(int argc, const char *argv[])
         /* EXTRACT KEYPOINT DESCRIPTORS */
 
         cv::Mat descriptors;
-        string descriptorExtractor = "BRIEF";  // BRISK, BRIEF, ORB, FREAK, AKAZE, SIFT
+        string descriptorExtractor = "ORB";  // BRISK, BRIEF, ORB, FREAK, AKAZE, SIFT
         descKeypoints((dataBuffer.end() - 1)->keypoints, (dataBuffer.end() - 1)->cameraImg, descriptors,
                       descriptorExtractor);
 
@@ -204,6 +212,24 @@ int main(int argc, const char *argv[])
                              (dataBuffer.end() - 2)->descriptors, (dataBuffer.end() - 1)->descriptors, matches,
                              descriptorType, matcherType, selectorType);
 
+            // visualize keypoint matches between current and previous frame
+            bool showKptDescMatches = false;
+            if (showKptDescMatches)
+            {
+                // visualize desc matching results
+                cv::Mat imgSource;
+                cv::cvtColor((dataBuffer.end() - 2)->cameraImg, imgSource, cv::COLOR_BGR2GRAY);
+                cv::Mat matchImg = imgGray.clone();
+                cv::drawMatches(imgSource, (dataBuffer.end() - 2)->keypoints, imgGray,
+                                (dataBuffer.end() - 1)->keypoints, matches, matchImg, cv::Scalar::all(-1),
+                                cv::Scalar::all(-1), vector<char>(), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
+
+                string windowName = "Matching keypoints between two camera images";
+                cv::namedWindow(windowName, 7);
+                cv::imshow(windowName, matchImg);
+                cv::waitKey(0);
+            }
+
             // store matches in current data frame
             (dataBuffer.end() - 1)->kptMatches = matches;
 
@@ -211,20 +237,22 @@ int main(int argc, const char *argv[])
 
             /* TRACK 3D OBJECT BOUNDING BOXES */
 
-            //// STUDENT ASSIGNMENT
-            //// TASK FP.1 -> match list of 3D objects (vector<BoundingBox>) between current and previous frame
-            ///(implement ->matchBoundingBoxes)
             map<int, int> bbBestMatches;
-            matchBoundingBoxes(
-                matches, bbBestMatches, *(dataBuffer.end() - 2),
-                *(dataBuffer.end() -
-                  1));  // associate bounding boxes between current and previous frame using keypoint matches
-            //// EOF STUDENT ASSIGNMENT
+            // associate bounding boxes between current and previous frame using keypoint matches
+            matchBoundingBoxes(matches, bbBestMatches, *(dataBuffer.end() - 2), *(dataBuffer.end() - 1));
 
             // store matches in current data frame
             (dataBuffer.end() - 1)->bbMatches = bbBestMatches;
 
             cout << "#8 : TRACK 3D OBJECT BOUNDING BOXES done" << endl;
+
+            // allows to cross check Bounding Boxes matching results (logged in console) in object detection
+            // visualtions for current and previous frames before proceeding with further processing steps
+            bool checkBBoxMacthingResults = false;
+            if (checkBBoxMacthingResults)
+            {
+                cv::waitKey(0);  // wait for key to be pressed
+            }
 
             /* COMPUTE TTC ON OBJECT IN FRONT */
 
@@ -273,7 +301,7 @@ int main(int argc, const char *argv[])
                                      currBB->kptMatches, sensorFrameRate, ttcCamera);
                     //// EOF STUDENT ASSIGNMENT
 
-                    bVis = true;
+                    bool bVis = false;
                     if (bVis)
                     {
                         cv::Mat visImg = (dataBuffer.end() - 1)->cameraImg.clone();
@@ -292,13 +320,10 @@ int main(int argc, const char *argv[])
                         cout << "Press key to continue to next frame" << endl;
                         cv::waitKey(0);
                     }
-                    bVis = false;
-
-                }  // eof TTC computation
-            }      // eof loop over all BB matches
+                }
+            }
         }
-
-    }  // eof loop over all images
+    }
 
     return 0;
 }
