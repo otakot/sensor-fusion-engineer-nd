@@ -1,6 +1,7 @@
 
 #include <algorithm>
 #include <cassert>
+//#include <cmath>
 #include <iostream>
 #include <numeric>
 #include <opencv2/highgui/highgui.hpp>
@@ -148,13 +149,77 @@ void clusterKptMatchesWithROI(BoundingBox &boundingBox, std::vector<cv::KeyPoint
 void computeTTCCamera(std::vector<cv::KeyPoint> &kptsPrev, std::vector<cv::KeyPoint> &kptsCurr,
                       std::vector<cv::DMatch> kptMatches, double frameRate, double &TTC, cv::Mat *visImg)
 {
-    // ...
+    TTC = 0;
 }
+
+namespace
+{
+double getmMedian(std::vector<double> data)
+{
+    const auto start = data.begin();
+    const auto end = data.end();
+
+    // Find  two adjacent elements in the middle of vector (they will be the same if vector size is odd)
+    const auto left_median_ptr = start + (data.size() - 1) / 2;
+    const auto right_median_ptr = start + data.size() / 2;
+
+    // Partial sort to place correct elements of vector at median indexes
+    std::nth_element(start, left_median_ptr, end);
+    std::nth_element(left_median_ptr, right_median_ptr, end);
+
+    return 0.5 * (*left_median_ptr + *right_median_ptr);
+}
+
+// double getStdDeviation(const std::vector<double> &data, double mean)
+// {
+//     double variance{0};
+//     for (const auto &elem : data)
+//     {
+//         variance += (elem - mean) * (elem - mean);
+//     }
+//     variance = variance / (double)data.size();
+//     return sqrt(variance);
+// }
+
+}  // namespace
 
 void computeTTCLidar(std::vector<LidarPoint> &lidarPointsPrev, std::vector<LidarPoint> &lidarPointsCurr,
                      double frameRate, double &TTC)
 {
-    // ...
+    double dT = 1 / frameRate;  // time between two measurements in seconds
+
+    // get distances to Lidar points
+    vector<double> Xprev;
+    std::transform(lidarPointsPrev.begin(), lidarPointsPrev.end(), std::back_inserter(Xprev),
+                   [](LidarPoint point) -> double { return point.x; });
+    std::sort(Xprev.begin(), Xprev.end());
+    double minXPrev = Xprev.front();
+    double maxXPrev = Xprev.back();
+
+    vector<double> Xcurr;
+    std::transform(lidarPointsCurr.begin(), lidarPointsCurr.end(), std::back_inserter(Xcurr),
+                   [](LidarPoint point) -> double { return point.x; });
+    std::sort(Xcurr.begin(), Xcurr.end());
+    double minXCurr = Xcurr.front();
+    double maxXCurr = Xcurr.back();
+
+    // median X value of lidar measuremetns of current frame (! not mean, to be more robust to outliers)
+    double medianXCurr = getmMedian(Xcurr);
+    // median X value of lidar measuremetns of previous frame (! not mean, to be more robust to outliers)
+    double medianXPrev = getmMedian(Xprev);
+    // standard deviation for X value of lidar measuremetns of current frame
+    // double sigmaXCurr = getStdDeviation(Xcurr, medianXCurr);
+    // standard deviation for X value of lidar measuremetns of previous frame
+    // double sigmaXPrev = getStdDeviation(Xprev, medianXPrev);
+    cout << "   Curr frame: Min X: " << minXCurr << "m, Max X: " << maxXCurr << "m, Median X: " << medianXCurr << endl;
+    //     << "m, Sigma: " << sigmaXCurr << "m" << endl;
+    cout << "   Prev frame: Min X: " << minXPrev << "m, Max X: " << maxXPrev << "m, Median X: " << medianXPrev << endl;
+    //    << "m, Sigma: " << sigmaXPrev << "m" << endl;
+
+    // compute TTC based on calculated distances to vehicle in front for previous and current frames
+    double minXTTC = minXCurr * dT / (minXPrev - minXCurr);
+    TTC = medianXCurr * dT / (medianXPrev - medianXCurr);
+    cout << "   Lidar TCC results: Min X based TTC: " << minXTTC << "s, median X based TTC: " << TTC << "s" << endl;
 }
 
 void matchBoundingBoxes(std::vector<cv::DMatch> &matches, std::map<int, int> &bbBestMatches, DataFrame &prevFrame,
@@ -201,18 +266,21 @@ void matchBoundingBoxes(std::vector<cv::DMatch> &matches, std::map<int, int> &bb
                 std::to_string(bBoxCurr.boxID);
             throw runtime_error(error_message);
         }
-        for (auto x : bBoxPrevMatchCandidates)
-        {
-            cout << "   match candicate: boxID: " << x.first << ", "
-                 << ", keypoints: " << x.second << endl;
-        }
+
+        // uncomment this block for debugging purposes
+        // for (auto x : bBoxPrevMatchCandidates)
+        // {
+        //     cout << "   match candicate: boxID: " << x.first << ", "
+        //          << ", keypoints: " << x.second << endl;
+        // }
+
         auto bestMatchBBoxPrev = std::max_element(bBoxPrevMatchCandidates.begin(), bBoxPrevMatchCandidates.end(),
                                                   [](const std::pair<int, int> &a, const std::pair<int, int> &b) -> bool
                                                   { return a.second < b.second; });
-        std::cout << "  BBox matching results: current frame bBox ID: " << bBoxCurr.boxID
+        std::cout << "  bBox match results: current bBox ID: " << bBoxCurr.boxID
                   << ", enclosed keypoints: " << bBoxCurrEclosedMatches.size()
-                  << ", previous frame bBoxId: " << bestMatchBBoxPrev->first
-                  << ", number of enclosed keypoints: " << bestMatchBBoxPrev->second << std::endl;
+                  << ", previous bBoxId: " << bestMatchBBoxPrev->first
+                  << ", enclosed keypoints: " << bestMatchBBoxPrev->second << std::endl;
 
         bbBestMatches[bBoxCurr.boxID] = bestMatchBBoxPrev->first;
     }

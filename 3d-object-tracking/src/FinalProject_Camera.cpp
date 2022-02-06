@@ -99,7 +99,7 @@ int main(int argc, const char *argv[])
 
         float confThreshold = 0.2;
         float nmsThreshold = 0.4;
-        bool showCurrFrameDetectedObjects = true;
+        bool showCurrFrameDetectedObjects = false;
         // detect objects in current frame
         detectObjects((dataBuffer.end() - 1)->cameraImg, (dataBuffer.end() - 1)->boundingBoxes, confThreshold,
                       nmsThreshold, yoloBasePath, yoloClassesFile, yoloModelConfiguration, yoloModelWeights,
@@ -141,7 +141,7 @@ int main(int argc, const char *argv[])
         bool showLidarPointsOfBoundingBoxesIn2D = true;
         if (showLidarPointsOfBoundingBoxesIn2D)
         {
-            show3DObjects((dataBuffer.end() - 1)->boundingBoxes, cv::Size(4.0, 20.0), cv::Size(2000, 2000), true);
+            show3DObjects((dataBuffer.end() - 1)->boundingBoxes, cv::Size(4.0, 20.0), cv::Size(1000, 1000), true);
         }
 
         cout << "#4 : CLUSTER LIDAR POINT CLOUD done" << endl;
@@ -265,7 +265,7 @@ int main(int argc, const char *argv[])
                 for (auto it2 = (dataBuffer.end() - 1)->boundingBoxes.begin();
                      it2 != (dataBuffer.end() - 1)->boundingBoxes.end(); ++it2)
                 {
-                    if (it1->second == it2->boxID)  // check wether current match partner corresponds to this BB
+                    if (it1->first == it2->boxID)  // check wether current match partner corresponds to this BB
                     {
                         currBB = &(*it2);
                     }
@@ -274,7 +274,7 @@ int main(int argc, const char *argv[])
                 for (auto it2 = (dataBuffer.end() - 2)->boundingBoxes.begin();
                      it2 != (dataBuffer.end() - 2)->boundingBoxes.end(); ++it2)
                 {
-                    if (it1->first == it2->boxID)  // check wether current match partner corresponds to this BB
+                    if (it1->second == it2->boxID)  // check wether previous match partner corresponds to this BB
                     {
                         prevBB = &(*it2);
                     }
@@ -284,12 +284,12 @@ int main(int argc, const char *argv[])
                 if (currBB->lidarPoints.size() > 0 &&
                     prevBB->lidarPoints.size() > 0)  // only compute TTC if we have Lidar points
                 {
-                    //// STUDENT ASSIGNMENT
-                    //// TASK FP.2 -> compute time-to-collision based on Lidar data (implement -> computeTTCLidar)
+                    cout << "   Best match to calculate TTC: current box: ID : " << currBB->boxID
+                         << ", lidar points: " << currBB->lidarPoints.size() << ", previous box: ID : " << prevBB->boxID
+                         << ", lidar points: " << prevBB->lidarPoints.size() << endl;
+                    // compute time-to-collision based on Lidar data
                     double ttcLidar;
                     computeTTCLidar(prevBB->lidarPoints, currBB->lidarPoints, sensorFrameRate, ttcLidar);
-                    //// EOF STUDENT ASSIGNMENT
-
                     //// STUDENT ASSIGNMENT
                     //// TASK FP.3 -> assign enclosed keypoint matches to bounding box (implement ->
                     /// clusterKptMatchesWithROI) / TASK FP.4 -> compute time-to-collision based on camera (implement ->
@@ -322,6 +322,11 @@ int main(int argc, const char *argv[])
                     }
                 }
             }
+        }
+        bool waitAfterFrameProcesssed = true;
+        if (waitAfterFrameProcesssed)
+        {
+            cv::waitKey(0);  // wait for key to be pressed
         }
     }
 
