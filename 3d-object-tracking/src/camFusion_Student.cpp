@@ -13,6 +13,37 @@
 
 using namespace std;
 
+namespace
+{
+double getMedian(std::vector<double> data)
+{
+    const auto start = data.begin();
+    const auto end = data.end();
+
+    // Find  two adjacent elements in the middle of vector (they will be the same if vector size is odd)
+    const auto left_median_ptr = start + (data.size() - 1) / 2;
+    const auto right_median_ptr = start + data.size() / 2;
+
+    // Partial sort to place correct elements of vector at median indexes
+    std::nth_element(start, left_median_ptr, end);
+    std::nth_element(left_median_ptr, right_median_ptr, end);
+
+    return 0.5 * (*left_median_ptr + *right_median_ptr);
+}
+
+double getStdDeviation(const std::vector<double> &data, double mean)
+{
+    double variance{0};
+    for (const auto &elem : data)
+    {
+        variance += (elem - mean) * (elem - mean);
+    }
+    variance = variance / (double)data.size();
+    return sqrt(variance);
+}
+
+}  // namespace
+
 // Create groups of Lidar points whose projection into the camera falls into the same bounding box
 void clusterLidarWithROI(std::vector<BoundingBox> &boundingBoxes, std::vector<LidarPoint> &lidarPoints,
                          float shrinkFactor, cv::Mat &P_rect_xx, cv::Mat &R_rect_xx, cv::Mat &RT)
@@ -50,7 +81,7 @@ void clusterLidarWithROI(std::vector<BoundingBox> &boundingBoxes, std::vector<Li
             // check wether point is within current bounding box
             if (smallerBox.contains(pt))
             {
-                enclosingBoxes.push_back(it2);
+                enclosingBoxes.emplace_back(it2);
             }
 
         }  // eof loop over all bounding boxes
@@ -59,7 +90,7 @@ void clusterLidarWithROI(std::vector<BoundingBox> &boundingBoxes, std::vector<Li
         if (enclosingBoxes.size() == 1)
         {
             // add Lidar point to bounding box
-            enclosingBoxes[0]->lidarPoints.push_back(*it1);
+            enclosingBoxes[0]->lidarPoints.emplace_back(*it1);
         }
 
     }  // eof loop over all Lidar points
@@ -142,7 +173,41 @@ void show3DObjects(std::vector<BoundingBox> &boundingBoxes, cv::Size worldSize, 
 void clusterKptMatchesWithROI(BoundingBox &boundingBox, std::vector<cv::KeyPoint> &kptsPrev,
                               std::vector<cv::KeyPoint> &kptsCurr, std::vector<cv::DMatch> &kptMatches)
 {
-    // ...
+    std::vector<double> matchedKptDistances;
+    std::vector<std::vector<cv::DMatch>::iterator> eclosedMatches;
+    for (auto kptMatch = kptMatches.begin(); kptMatch != kptMatches.end(); ++kptMatch)
+    {
+        const auto &currKpt = kptsCurr[kptMatch->trainIdx];
+        if (boundingBox.roi.contains(currKpt.pt))
+        {
+            eclosedMatches.emplace_back(kptMatch);
+            const auto &prevKpt = kptsPrev[kptMatch->queryIdx];
+
+            // calculate euclidean distance [in pixels] between matched keypoints
+            double dx = currKpt.pt.x - prevKpt.pt.x;
+            double dy = currKpt.pt.y - prevKpt.pt.y;
+            double eclideanDistance = std::sqrt((dx * dx) + (dy * dy));
+            matchedKptDistances.emplace_back(eclideanDistance);
+        }
+    }
+
+    // double distanceMean = std::accumulate(matchedKptDistances.begin(), matchedKptDistances.end(), 0.0) /
+    //                       (double)matchedKptDistances.size();
+    double distanceMedian = getMedian(matchedKptDistances);  // median allowes to disqualify outliers better than mean
+    double sigma = getStdDeviation(matchedKptDistances, distanceMedian);
+
+    for (int i = 0; i < eclosedMatches.size(); i++)
+    {
+        // toleration of sigma/4 deviation from median distance value across all matched keypoints
+        if (abs(matchedKptDistances[i] - distanceMedian) <= sigma / 4)
+        {
+            boundingBox.keypoints.emplace_back(kptsCurr[eclosedMatches[i]->trainIdx]);
+            boundingBox.kptMatches.emplace_back(*(eclosedMatches[i]));
+        }
+    }
+    cout << "   Cluster Keypoints results for bBox ID " << boundingBox.boxID
+         << ": eclosed matches: " << eclosedMatches.size() << ", Euclidean distance median: " << distanceMedian
+         << "px, StDev: " << sigma << "px, qualified matches: " << boundingBox.kptMatches.size() << endl;
 }
 
 // Compute time-to-collision (TTC) based on keypoint correspondences in successive images
@@ -151,37 +216,6 @@ void computeTTCCamera(std::vector<cv::KeyPoint> &kptsPrev, std::vector<cv::KeyPo
 {
     TTC = 0;
 }
-
-namespace
-{
-double getmMedian(std::vector<double> data)
-{
-    const auto start = data.begin();
-    const auto end = data.end();
-
-    // Find  two adjacent elements in the middle of vector (they will be the same if vector size is odd)
-    const auto left_median_ptr = start + (data.size() - 1) / 2;
-    const auto right_median_ptr = start + data.size() / 2;
-
-    // Partial sort to place correct elements of vector at median indexes
-    std::nth_element(start, left_median_ptr, end);
-    std::nth_element(left_median_ptr, right_median_ptr, end);
-
-    return 0.5 * (*left_median_ptr + *right_median_ptr);
-}
-
-// double getStdDeviation(const std::vector<double> &data, double mean)
-// {
-//     double variance{0};
-//     for (const auto &elem : data)
-//     {
-//         variance += (elem - mean) * (elem - mean);
-//     }
-//     variance = variance / (double)data.size();
-//     return sqrt(variance);
-// }
-
-}  // namespace
 
 void computeTTCLidar(std::vector<LidarPoint> &lidarPointsPrev, std::vector<LidarPoint> &lidarPointsCurr,
                      double frameRate, double &TTC)
@@ -204,9 +238,9 @@ void computeTTCLidar(std::vector<LidarPoint> &lidarPointsPrev, std::vector<Lidar
     double maxXCurr = Xcurr.back();
 
     // median X value of lidar measuremetns of current frame (! not mean, to be more robust to outliers)
-    double medianXCurr = getmMedian(Xcurr);
+    double medianXCurr = getMedian(Xcurr);
     // median X value of lidar measuremetns of previous frame (! not mean, to be more robust to outliers)
-    double medianXPrev = getmMedian(Xprev);
+    double medianXPrev = getMedian(Xprev);
     // standard deviation for X value of lidar measuremetns of current frame
     // double sigmaXCurr = getStdDeviation(Xcurr, medianXCurr);
     // standard deviation for X value of lidar measuremetns of previous frame
