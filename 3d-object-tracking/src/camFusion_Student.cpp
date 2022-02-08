@@ -42,6 +42,13 @@ double getStdDeviation(const std::vector<double> &data, double mean)
     return sqrt(variance);
 }
 
+double computeEuclideanDistance(cv::Point2f rhs, cv::Point2f lhs)
+{
+    double dx = rhs.x - lhs.x;
+    double dy = rhs.y - lhs.y;
+    return std::sqrt((dx * dx) + (dy * dy));
+}
+
 }  // namespace
 
 // Create groups of Lidar points whose projection into the camera falls into the same bounding box
@@ -184,10 +191,8 @@ void clusterKptMatchesWithROI(BoundingBox &boundingBox, std::vector<cv::KeyPoint
             const auto &prevKpt = kptsPrev[kptMatch->queryIdx];
 
             // calculate euclidean distance [in pixels] between matched keypoints
-            double dx = currKpt.pt.x - prevKpt.pt.x;
-            double dy = currKpt.pt.y - prevKpt.pt.y;
-            double eclideanDistance = std::sqrt((dx * dx) + (dy * dy));
-            matchedKptDistances.emplace_back(eclideanDistance);
+            double dist = computeEuclideanDistance(currKpt.pt, prevKpt.pt);
+            matchedKptDistances.emplace_back(dist);
         }
     }
 
@@ -199,7 +204,7 @@ void clusterKptMatchesWithROI(BoundingBox &boundingBox, std::vector<cv::KeyPoint
     for (int i = 0; i < eclosedMatches.size(); i++)
     {
         // toleration of sigma/4 deviation from median distance value across all matched keypoints
-        if (abs(matchedKptDistances[i] - distanceMedian) <= sigma / 4)
+        if (abs(matchedKptDistances[i] - distanceMedian) <= sigma / 10)
         {
             boundingBox.keypoints.emplace_back(kptsCurr[eclosedMatches[i]->trainIdx]);
             boundingBox.kptMatches.emplace_back(*(eclosedMatches[i]));
@@ -214,7 +219,45 @@ void clusterKptMatchesWithROI(BoundingBox &boundingBox, std::vector<cv::KeyPoint
 void computeTTCCamera(std::vector<cv::KeyPoint> &kptsPrev, std::vector<cv::KeyPoint> &kptsCurr,
                       std::vector<cv::DMatch> kptMatches, double frameRate, double &TTC, cv::Mat *visImg)
 {
-    TTC = 0;
+    vector<double> distRatios;  // distance ratios for all meaningful keypoint pairs between current and previous frame
+    for (auto it1 = kptMatches.begin(); it1 != kptMatches.end() - 1; ++it1)
+    {
+        // get current keypoint and its matched partner in the previous frame
+        const auto kptOuterCurr = kptsCurr.at(it1->trainIdx);
+        const auto kptOuterPrev = kptsPrev.at(it1->queryIdx);
+
+        for (auto it2 = kptMatches.begin() + 1; it2 != kptMatches.end(); ++it2)
+        {
+            // min. tolerated distance [in px] between keypoints in the frame
+            // which will allow to properly calculate TTC
+            double minDistance = 100.0;
+            // get next keypoint and its matched partner in the previous frame
+            const auto kptInnerCurr = kptsCurr.at(it2->trainIdx);
+            const auto kptInnerPrev = kptsPrev.at(it2->queryIdx);
+
+            // compute distances between same key point pairs in both current and previous frames
+            // and ratio between these distances to identify the camera image scale change
+            double distCurr = computeEuclideanDistance(kptOuterCurr.pt, kptInnerCurr.pt);
+            double distPrev = computeEuclideanDistance(kptOuterPrev.pt, kptInnerPrev.pt);
+
+            if (distPrev > std::numeric_limits<double>::epsilon() && distCurr >= minDistance)
+            {
+                double distRatio = distCurr / distPrev;
+                distRatios.emplace_back(distRatio);
+            }
+        }
+    }
+    // exit if list of distance ratios is empty
+    if (distRatios.size() == 0)
+    {
+        TTC = NAN;
+        return;
+    }
+    // compute camera-based TTC based on distance ratios
+    double medianDistRatio = getMedian(distRatios);
+    double dT = 1 / frameRate;  // time [in seconds] between camera measurements (images)
+    TTC = -dT / (1 - medianDistRatio);
+    cout << "   Camera TCC results: inter keypoint median distances ratio based TTC: " << TTC << "s" << endl;
 }
 
 void computeTTCLidar(std::vector<LidarPoint> &lidarPointsPrev, std::vector<LidarPoint> &lidarPointsCurr,
