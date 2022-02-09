@@ -138,10 +138,10 @@ int main(int argc, const char *argv[])
                             P_rect_00, R_rect_00, RT);
 
         // Visualize 3D objects
-        bool showLidarPointsOfBoundingBoxesIn2D = true;
+        bool showLidarPointsOfBoundingBoxesIn2D = false;
         if (showLidarPointsOfBoundingBoxesIn2D)
         {
-            show3DObjects((dataBuffer.end() - 1)->boundingBoxes, cv::Size(4.0, 20.0), cv::Size(1000, 1000), true);
+            show3DObjects((dataBuffer.end() - 1)->boundingBoxes, cv::Size(3.0, 12.0), cv::Size(1200, 400), true);
         }
 
         cout << "#4 : CLUSTER LIDAR POINT CLOUD done" << endl;
@@ -260,12 +260,12 @@ int main(int argc, const char *argv[])
             for (auto it1 = (dataBuffer.end() - 1)->bbMatches.begin(); it1 != (dataBuffer.end() - 1)->bbMatches.end();
                  ++it1)
             {
-                // find bounding boxes associates with current match
+                // find bounding boxes in current and previous frames that associate with IDs in this best match
                 BoundingBox *prevBB, *currBB;
                 for (auto it2 = (dataBuffer.end() - 1)->boundingBoxes.begin();
                      it2 != (dataBuffer.end() - 1)->boundingBoxes.end(); ++it2)
                 {
-                    if (it1->first == it2->boxID)  // check wether current match partner corresponds to this BB
+                    if (it1->second == it2->boxID)  // check wether current match partner corresponds to this BB
                     {
                         currBB = &(*it2);
                     }
@@ -274,7 +274,7 @@ int main(int argc, const char *argv[])
                 for (auto it2 = (dataBuffer.end() - 2)->boundingBoxes.begin();
                      it2 != (dataBuffer.end() - 2)->boundingBoxes.end(); ++it2)
                 {
-                    if (it1->second == it2->boxID)  // check wether previous match partner corresponds to this BB
+                    if (it1->first == it2->boxID)  // check wether previous match partner corresponds to this BB
                     {
                         prevBB = &(*it2);
                     }
@@ -297,7 +297,7 @@ int main(int argc, const char *argv[])
                     computeTTCCamera((dataBuffer.end() - 2)->keypoints, (dataBuffer.end() - 1)->keypoints,
                                      currBB->kptMatches, sensorFrameRate, ttcCamera);
 
-                    bool bVis = false;
+                    bool bVis = true;
                     if (bVis)
                     {
                         cv::Mat visImg = (dataBuffer.end() - 1)->cameraImg.clone();
@@ -318,11 +318,6 @@ int main(int argc, const char *argv[])
                     }
                 }
             }
-        }
-        bool waitAfterFrameProcesssed = true;
-        if (waitAfterFrameProcesssed)
-        {
-            cv::waitKey(0);  // wait for key to be pressed
         }
     }
 

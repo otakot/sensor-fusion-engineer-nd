@@ -103,11 +103,6 @@ void clusterLidarWithROI(std::vector<BoundingBox> &boundingBoxes, std::vector<Li
     }  // eof loop over all Lidar points
 }
 
-/*
- * The show3DObjects() function below can handle different output image sizes, but the text output has been manually
- * tuned to fit the 2000x2000 size. However, you can make this function work for other sizes too. For instance, to use a
- * 1000x1000 size, adjusting the text positions by dividing them by 2.
- */
 void show3DObjects(std::vector<BoundingBox> &boundingBoxes, cv::Size worldSize, cv::Size imageSize, bool bWait)
 {
     // create topview image
@@ -151,9 +146,9 @@ void show3DObjects(std::vector<BoundingBox> &boundingBoxes, cv::Size worldSize, 
         // augment object with some key data
         char str1[200], str2[200];
         sprintf(str1, "id=%d, #pts=%d", it1->boxID, (int)it1->lidarPoints.size());
-        putText(topviewImg, str1, cv::Point2f(left - 250, bottom + 50), cv::FONT_ITALIC, 2, currColor);
+        putText(topviewImg, str1, cv::Point2f(left + 5, bottom - 55), cv::FONT_ITALIC, 1, currColor);
         sprintf(str2, "xmin=%2.2f m, yw=%2.2f m", xwmin, ywmax - ywmin);
-        putText(topviewImg, str2, cv::Point2f(left - 250, bottom + 125), cv::FONT_ITALIC, 2, currColor);
+        putText(topviewImg, str2, cv::Point2f(left + 5, bottom - 22), cv::FONT_ITALIC, 1, currColor);
     }
 
     // plot distance markers
@@ -163,6 +158,10 @@ void show3DObjects(std::vector<BoundingBox> &boundingBoxes, cv::Size worldSize, 
     {
         int y = (-(i * lineSpacing) * imageSize.height / worldSize.height) + imageSize.height;
         cv::line(topviewImg, cv::Point(0, y), cv::Point(imageSize.width, y), cv::Scalar(255, 0, 0));
+        putText(topviewImg, std::to_string((int)(i * lineSpacing)) + "m", cv::Point(5, y - 10), cv::FONT_ITALIC, 1,
+                cv::Scalar(255, 0, 0));
+        putText(topviewImg, std::to_string((int)(i * lineSpacing)) + "m", cv::Point(imageSize.width - 80, y - 10),
+                cv::FONT_ITALIC, 1, cv::Scalar(255, 0, 0));
     }
 
     // display image
@@ -230,7 +229,7 @@ void computeTTCCamera(std::vector<cv::KeyPoint> &kptsPrev, std::vector<cv::KeyPo
         {
             // min. tolerated distance [in px] between keypoints in the frame
             // which will allow to properly calculate TTC
-            double minDistance = 100.0;
+            double minDistance = 110.0;
             // get next keypoint and its matched partner in the previous frame
             const auto kptInnerCurr = kptsCurr.at(it2->trainIdx);
             const auto kptInnerPrev = kptsPrev.at(it2->queryIdx);
@@ -255,9 +254,16 @@ void computeTTCCamera(std::vector<cv::KeyPoint> &kptsPrev, std::vector<cv::KeyPo
     }
     // compute camera-based TTC based on distance ratios
     double medianDistRatio = getMedian(distRatios);
+    double meanDistRatio = std::accumulate(distRatios.begin(), distRatios.end(), 0.0) / distRatios.size();
     double dT = 1 / frameRate;  // time [in seconds] between camera measurements (images)
-    TTC = -dT / (1 - medianDistRatio);
-    cout << "   Camera TCC results: inter keypoint median distances ratio based TTC: " << TTC << "s" << endl;
+
+    // if true, then median ratio values will be used for TTC calculation instead of mean
+    bool useMedianDistRatioForTTC = true;
+    double medianDistRatioTTC = -dT / (1 - medianDistRatio);
+    double meanDistRatioTTC = -dT / (1 - meanDistRatio);
+    cout << "   Camera TCC results: Median distance ratio based TTC: " << medianDistRatioTTC
+         << "s, Mean distance ratio based TTC: " << meanDistRatioTTC << "s" << endl;
+    TTC = useMedianDistRatioForTTC ? medianDistRatioTTC : meanDistRatioTTC;
 }
 
 void computeTTCLidar(std::vector<LidarPoint> &lidarPointsPrev, std::vector<LidarPoint> &lidarPointsCurr,
@@ -294,53 +300,57 @@ void computeTTCLidar(std::vector<LidarPoint> &lidarPointsPrev, std::vector<Lidar
     //    << "m, Sigma: " << sigmaXPrev << "m" << endl;
 
     // compute TTC based on calculated distances to vehicle in front for previous and current frames
+    bool useMedianXforTTC = true;  // if true, then median X values will be used for TTC calculation instead of min X
     double minXTTC = minXCurr * dT / (minXPrev - minXCurr);
-    TTC = medianXCurr * dT / (medianXPrev - medianXCurr);
-    cout << "   Lidar TCC results: Min X based TTC: " << minXTTC << "s, median X based TTC: " << TTC << "s" << endl;
+    double medianXTTC = medianXCurr * dT / (medianXPrev - medianXCurr);
+    TTC = (useMedianXforTTC) ? medianXTTC : minXTTC;
+    cout << "   Lidar TCC results: Median X based TTC: " << medianXTTC << "s, Min X based TTC: " << minXTTC << "s,"
+         << endl;
 }
 
 void matchBoundingBoxes(std::vector<cv::DMatch> &matches, std::map<int, int> &bbBestMatches, DataFrame &prevFrame,
                         DataFrame &currFrame)
 
 {
-    // iterate over all bounding boxes of current frame
-    // and find best correspondence for each of them in previous frame
-    for (const auto &bBoxCurr : currFrame.boundingBoxes)
+    // idea is to iterate over all bounding boxes of previous frame
+    // and find best correspondence for each of them in ciurrent frame
+    for (const auto &bBoxPrev : prevFrame.boundingBoxes)
     {
-        // list of matches, which target keypoints (in current frame) are eclosed by this bounding box
-        std::vector<std::vector<cv::DMatch>::iterator> bBoxCurrEclosedMatches;
+        // list of matches, which target keypoints (in previous frame) are eclosed by this bounding box
+        std::vector<std::vector<cv::DMatch>::iterator> bBoxPrevEclosedMatches;
         for (auto kptMatchPtr = matches.begin(); kptMatchPtr != matches.end(); ++kptMatchPtr)
         {
-            assert(currFrame.keypoints.size() > kptMatchPtr->trainIdx);
-            const auto &keyPoint = currFrame.keypoints.at(kptMatchPtr->trainIdx);
-            // check wether keypoint  is within bounding box of current frame
-            if (bBoxCurr.roi.contains(keyPoint.pt))
+            assert(prevFrame.keypoints.size() > kptMatchPtr->queryIdx);
+            const auto &keyPoint = prevFrame.keypoints.at(kptMatchPtr->queryIdx);
+            // check wether keypoint is within bounding box of previous frame
+            if (bBoxPrev.roi.contains(keyPoint.pt))
             {
-                bBoxCurrEclosedMatches.push_back(kptMatchPtr);
+                bBoxPrevEclosedMatches.push_back(kptMatchPtr);
             }
         }
 
-        // IDs of bounding Boxes in previous frame that enclose
-        // source keypoints the matches identified above
-        std::unordered_map<int, int> bBoxPrevMatchCandidates;
-        for (const auto &bBoxPrev : prevFrame.boundingBoxes)
+        // IDs of bounding Boxes in current frame that enclose
+        // source keypoint matches identified above
+        std::unordered_map<int, int> bBoxCurrMatchCandidates;
+        for (const auto &bBoxCurr : currFrame.boundingBoxes)
         {
-            for (const auto enclosedMatch : bBoxCurrEclosedMatches)
+            for (const auto enclosedMatch : bBoxPrevEclosedMatches)
             {
-                assert(prevFrame.keypoints.size() > enclosedMatch->queryIdx);
-                const auto &keyPoint = prevFrame.keypoints.at(enclosedMatch->queryIdx);
-                // check wether keypoint is within this bounding box
-                if (bBoxPrev.roi.contains(keyPoint.pt))
+                assert(currFrame.keypoints.size() > enclosedMatch->trainIdx);
+                const auto &keyPoint = currFrame.keypoints.at(enclosedMatch->trainIdx);
+                // check whether keypoint is within this bounding box
+                if (bBoxCurr.roi.contains(keyPoint.pt))
                 {
-                    bBoxPrevMatchCandidates[bBoxPrev.boxID] += 1;
+                    bBoxCurrMatchCandidates[bBoxCurr.boxID] += 1;
                 }
             }
         }
-        if (bBoxPrevMatchCandidates.empty())
+        if (bBoxCurrMatchCandidates.empty())
         {
             string error_message =
-                "No matching bounding box found in previous frame for bounding box in current frame with ID: " +
-                std::to_string(bBoxCurr.boxID);
+                "No matching bounding box found in current frame "
+                "for corresponding bounding box of previous frame with ID: " +
+                std::to_string(bBoxPrev.boxID);
             throw runtime_error(error_message);
         }
 
@@ -351,14 +361,14 @@ void matchBoundingBoxes(std::vector<cv::DMatch> &matches, std::map<int, int> &bb
         //          << ", keypoints: " << x.second << endl;
         // }
 
-        auto bestMatchBBoxPrev = std::max_element(bBoxPrevMatchCandidates.begin(), bBoxPrevMatchCandidates.end(),
+        auto bestMatchBBoxCurr = std::max_element(bBoxCurrMatchCandidates.begin(), bBoxCurrMatchCandidates.end(),
                                                   [](const std::pair<int, int> &a, const std::pair<int, int> &b) -> bool
                                                   { return a.second < b.second; });
-        std::cout << "  bBox match results: current bBox ID: " << bBoxCurr.boxID
-                  << ", enclosed keypoints: " << bBoxCurrEclosedMatches.size()
-                  << ", previous bBoxId: " << bestMatchBBoxPrev->first
-                  << ", enclosed keypoints: " << bestMatchBBoxPrev->second << std::endl;
+        std::cout << "  bBox match results: previous bBox ID: " << bBoxPrev.boxID
+                  << ", enclosed keypoints: " << bBoxPrevEclosedMatches.size()
+                  << ", current bBoxId: " << bestMatchBBoxCurr->first
+                  << ", enclosed keypoints: " << bestMatchBBoxCurr->second << std::endl;
 
-        bbBestMatches[bBoxCurr.boxID] = bestMatchBBoxPrev->first;
+        bbBestMatches[bBoxPrev.boxID] = bestMatchBBoxCurr->first;
     }
 }
