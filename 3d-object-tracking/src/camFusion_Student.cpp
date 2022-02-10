@@ -15,7 +15,7 @@ using namespace std;
 
 namespace
 {
-double getMedian(std::vector<double> data)
+double getMedian(std::vector<double> &data)
 {
     const auto start = data.begin();
     const auto end = data.end();
@@ -274,14 +274,14 @@ void computeTTCLidar(std::vector<LidarPoint> &lidarPointsPrev, std::vector<Lidar
     // get distances to Lidar points
     vector<double> Xprev;
     std::transform(lidarPointsPrev.begin(), lidarPointsPrev.end(), std::back_inserter(Xprev),
-                   [](LidarPoint point) -> double { return point.x; });
+                   [](const auto &point) -> double { return point.x; });
     std::sort(Xprev.begin(), Xprev.end());
     double minXPrev = Xprev.front();
     double maxXPrev = Xprev.back();
 
     vector<double> Xcurr;
     std::transform(lidarPointsCurr.begin(), lidarPointsCurr.end(), std::back_inserter(Xcurr),
-                   [](LidarPoint point) -> double { return point.x; });
+                   [](const auto &point) -> double { return point.x; });
     std::sort(Xcurr.begin(), Xcurr.end());
     double minXCurr = Xcurr.front();
     double maxXCurr = Xcurr.back();
@@ -290,14 +290,8 @@ void computeTTCLidar(std::vector<LidarPoint> &lidarPointsPrev, std::vector<Lidar
     double medianXCurr = getMedian(Xcurr);
     // median X value of lidar measuremetns of previous frame (! not mean, to be more robust to outliers)
     double medianXPrev = getMedian(Xprev);
-    // standard deviation for X value of lidar measuremetns of current frame
-    // double sigmaXCurr = getStdDeviation(Xcurr, medianXCurr);
-    // standard deviation for X value of lidar measuremetns of previous frame
-    // double sigmaXPrev = getStdDeviation(Xprev, medianXPrev);
     cout << "   Curr frame: Min X: " << minXCurr << "m, Max X: " << maxXCurr << "m, Median X: " << medianXCurr << endl;
-    //     << "m, Sigma: " << sigmaXCurr << "m" << endl;
     cout << "   Prev frame: Min X: " << minXPrev << "m, Max X: " << maxXPrev << "m, Median X: " << medianXPrev << endl;
-    //    << "m, Sigma: " << sigmaXPrev << "m" << endl;
 
     // compute TTC based on calculated distances to vehicle in front for previous and current frames
     bool useMedianXforTTC = true;  // if true, then median X values will be used for TTC calculation instead of min X
@@ -313,7 +307,7 @@ void matchBoundingBoxes(std::vector<cv::DMatch> &matches, std::map<int, int> &bb
 
 {
     // idea is to iterate over all bounding boxes of previous frame
-    // and find best correspondence for each of them in ciurrent frame
+    // and find best correspondence for each of them in current frame
     for (const auto &bBoxPrev : prevFrame.boundingBoxes)
     {
         // list of matches, which target keypoints (in previous frame) are eclosed by this bounding box
