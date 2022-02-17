@@ -188,7 +188,7 @@ CUTd_margin = Td+Gd;
 N_training_cells = ((2*Tr + 2*Gr + 1)*(2*Td + 2*Gd + 1)) - ((2*Gr + 1)*(2*Gd + 1))
 % convert values of cells inside range doppler map to linear scale
 RDM_linear = db2pow(RDM);
-% iterate over all cells under stest in range doppler map
+% iterate over all cells under test in range doppler map
 for CUTr_idx=(CUTr_margin+1):((Nr/2)-CUTr_margin)
     for CUTd_idx=(CUTd_margin+1):(Nd - CUTd_margin)
 
