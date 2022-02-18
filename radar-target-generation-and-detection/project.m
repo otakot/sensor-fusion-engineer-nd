@@ -59,32 +59,26 @@ td=zeros(1,length(t));
 
 %% Signal generation and Moving Target simulation
 % Running the radar scenario over the time. 
+           
+% *%TODO* :
+%For each time stamp update the Range of the Target for constant velocity.
+r_t = R + v * t;
+td = 2 * r_t / C;
 
-for i=1:length(t)          
-    
-    % *%TODO* :
-    %For each time stamp update the Range of the Target for constant velocity.
-    r_t(i) = R+(t(i)*v);
-    td(i) = (2*r_t(i))/C;
-    
-    % *%TODO* :
-    %For each time sample we need update the transmitted and
-    %received signal. 
-    Tx(i) = cos(2*pi * (fc*t(i) + ( (slope * t(i)*t(i)) / 2 ) )); 
+% *%TODO* :
+%For each time sample we need update the transmitted and
+%received signal. 
+Tx = cos(2*pi*(fc*t + (slope*(t.^2)/2)));
+Rx = cos(2*pi*(fc*(t - td) + (slope*((t - td).^2)/2)));
 
-    trx = t(i) - td(i);
-    Rx(i) = cos(2*pi * (fc*trx + ((slope * trx*trx) / 2) )); 
-    
-    % *%TODO* :
-    %Now by mixing the Transmit and Receive generate the beat signal
-    %This is done by element wise matrix multiplication of Transmit and
-    %Receiver Signal
-    Mix(i) = Tx(i) * Rx(i);
-    
-end
+% *%TODO* :
+%Now by mixing the Transmit and Receive generate the beat signal
+%This is done by element wise matrix multiplication of Transmit and
+%Receiver Signal
+Mix = Tx .* Rx;
+
 
 %% RANGE MEASUREMENT
-
 
  % *%TODO* :
 %reshape the vector into Nr*Nd array. Nr and Nd here would also define the size of
@@ -182,7 +176,6 @@ noise_level = zeros(1,1);
 
    % Use RDM[x,y] as the matrix from the output of 2D FFT for implementing
    % CFAR
-sum = 0;
 CUTr_margin = Tr+Gr;
 CUTd_margin = Td+Gd;
 N_training_cells = ((2*Tr + 2*Gr + 1)*(2*Td + 2*Gd + 1)) - ((2*Gr + 1)*(2*Gd + 1))
@@ -220,6 +213,26 @@ for CUTr_idx=(CUTr_margin+1):((Nr/2)-CUTr_margin)
         end
     end
 end
+
+%# Vectorized form
+%# Use conv2 to do the averaging
+%# Define mask where guard bands + centre is set to 0
+%# Divide by the total number of non-zero elements
+mask = ones(2 * Tr + 2 * Gr + 1, 2 * Td + 2 * Gd + 1);
+centre_coord = [Tr + Gr + 1, Td + Gd + 1];
+mask(centre_coord(1) - Gr : centre_coord(1) + Gr, centre_coord(2) - Gd : centre_coord(2) + Gd) = 0;
+mask = mask / sum(mask(:));
+
+%# Perform 180 degree rotation as convolution will do this so rotating by
+%# 180 first, then letting conv2 do it will result in the original mask
+mask = mask(end:-1:1, end:-1:1);
+
+%# Convolve, then convert back to dB to add the offset
+%# The convolution defines the threshold
+threshold = conv2(db2pow(RDM), mask, 'same');
+threshold = pow2db(threshold) + offset;
+
+
 
 % *%TODO* :
 % The process above will generate a thresholded block, which is smaller 
